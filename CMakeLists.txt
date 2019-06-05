@@ -3,28 +3,40 @@ project(abb_libegm)
 
 find_package(catkin REQUIRED)
 
-find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(Boost REQUIRED COMPONENTS system thread regex)
 
 #############################
 ## Google Protocol Buffers ##
 #############################
 find_package(Protobuf REQUIRED)
 
-# work around Protobuf exporting 'lpthread' as a library: we
+# Workaround Protobuf exporting 'lpthread' as a library: we
 # export the dependency on pthread using the CFG_EXTRAS files
-list (REMOVE_ITEM PROTOBUF_LIBRARIES "-lpthread")
+if (PROTOBUF_LIBRARIES)
+  list (REMOVE_ITEM PROTOBUF_LIBRARIES "-lpthread")
+endif()
+if (Protobuf_LIBRARIES)
+  list (REMOVE_ITEM Protobuf_LIBRARIES "-lpthread")
+endif()
 
-# Make sure protoc is present, as apparently the above find_package() doesn't check that.
-find_program(Protobuf_PROTOC_LOC NAMES protoc)
-if (NOT Protobuf_PROTOC_LOC)
+# Make sure 'protoc' is present, as apparently the above find_package() doesn't check that.
+# Notes for ROS on Windows:
+# - The protobuf compiler appears to be default installed at ${_CMAKE_INSTALL_DIR}/tools/protobuf.
+# - find_program() doesn't seem to find the compiler without specifying an extra search path.
+find_program(PROTOBUF_PROTOC_EXECUTABLE protoc PATH ${_CMAKE_INSTALL_DIR}/tools/protobuf)
+find_program(Protobuf_PROTOC_EXECUTABLE protoc PATH ${_CMAKE_INSTALL_DIR}/tools/protobuf)
+
+if (NOT PROTOBUF_PROTOC_EXECUTABLE AND NOT Protobuf_PROTOC_EXECUTABLE)
   message(FATAL_ERROR "Cannot find required 'protoc', cannot process Protobuf files without it. Aborting.")
 endif()
 
 # Generate C++ for protocol classes (headers and sources get written to the CMAKE_CURRENT_BINARY_DIR location).
 set(EgmProtoFiles proto/egm.proto proto/egm_wrapper.proto proto/egm_wrapper_trajectory.proto)
+
 if (NOT QUIET)
   message(STATUS "Generating protobuf C++ for: ${EgmProtoFiles}")
 endif()
+
 protobuf_generate_cpp(EgmProtoSources EgmProtoHeaders ${EgmProtoFiles})
 
 ###################################
@@ -40,7 +52,7 @@ catkin_package(
     abb_libegm-extras.cmake
   DEPENDS
     Boost
-    PROTOBUF
+    Protobuf
 )
 
 ###########
@@ -61,16 +73,18 @@ include_directories(include
                     ${CMAKE_CURRENT_BINARY_DIR} # Contains protobuf generated sources
                     ${Boost_INCLUDE_DIRS}
                     ${PROTOBUF_INCLUDE_DIRS}
+                    ${Protobuf_INCLUDE_DIRS}
                     ${catkin_INCLUDE_DIRS})
 
 add_library(${PROJECT_NAME} ${SRC_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${PROTOBUF_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${PROTOBUF_LIBRARIES} ${Protobuf_LIBRARIES} ${catkin_LIBRARIES})
 
 #############
 ## Install ##
 #############
 install(TARGETS ${PROJECT_NAME}
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 
 install(DIRECTORY include/${PROJECT_NAME}/
