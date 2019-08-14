@@ -3,20 +3,22 @@ project(abb_libegm)
 
 find_package(catkin REQUIRED)
 
-find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(Boost REQUIRED COMPONENTS system thread regex)
 
 #############################
 ## Google Protocol Buffers ##
 #############################
-find_package(Protobuf REQUIRED)
+find_package(Protobuf CONFIG REQUIRED)
+if(NOT Protobuf_FOUND)
+  find_package(Protobuf REQUIRED)
+endif()
 
 # work around Protobuf exporting 'lpthread' as a library: we
 # export the dependency on pthread using the CFG_EXTRAS files
 list (REMOVE_ITEM PROTOBUF_LIBRARIES "-lpthread")
 
 # Make sure protoc is present, as apparently the above find_package() doesn't check that.
-find_program(Protobuf_PROTOC_LOC NAMES protoc)
-if (NOT Protobuf_PROTOC_LOC)
+if(NOT TARGET protobuf::protoc)
   message(FATAL_ERROR "Cannot find required 'protoc', cannot process Protobuf files without it. Aborting.")
 endif()
 
@@ -71,7 +73,9 @@ target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${PROTOBUF_LIBRARIES} $
 ## Install ##
 #############
 install(TARGETS ${PROJECT_NAME}
-        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
 
 install(DIRECTORY include/${PROJECT_NAME}/
         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
